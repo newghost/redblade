@@ -17,6 +17,10 @@ Create and remove index key automatically
 
 
 
+Install
+
+
+    npm install redblade
 
 
 
