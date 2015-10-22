@@ -262,7 +262,7 @@ describe('Redblade 测试用例', function() {
     })
 
     it('redblade:remove 检测删除文章后是否从关键字集合中移除，如 articlekeys:NoSQL', function(done) {
-      redblade.remove('article', { poster: 'airjd' }, function(err, num) {
+      redblade.remove('article', { poster: 'airjd', keywords: 'NoSQL' }, function(err, num) {
         redblade.client.zrange('articlekeys:NoSQL', 0, 100, function(err, members) {
           console.log(members)
           assert.equal(members.length, 0)

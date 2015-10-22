@@ -24,7 +24,7 @@ Create and remove index key automatically
 
 Init
 
-	  //create a redis client
+    //create a redis client
     var client = require('redis').createClient();
 
     //choose an empty DB
@@ -51,15 +51,15 @@ Load Schema: article
 
 Insert an article
 
-      redblade.insert('article', {
-         _id        : '1234567890'
-       , poster     : 'airjd'
-       , keywords   : '信息技术,JavaScript,NoSQL'
-       , title      : '测试用的SLIDE 标题'
-       , content    : '测试用的SLIDE 内容'
-      }, function(err) {
+    redblade.insert('article', {
+       _id        : '1234567890'
+      , poster     : 'airjd'
+      , keywords   : '信息技术,JavaScript,NoSQL'
+      , title      : '测试用的SLIDE 标题'
+      , content    : '测试用的SLIDE 内容'
+    }, function(err) {
 
-      })
+    })
 
 
 Select User by Index Field
@@ -96,6 +96,19 @@ What happened?
     set: "poster" : "index('user_article')" => user_article:[poster value]
     */
     redblade.client.smembers('user_article:airjd', function (err, articleIDs) {
-        assert.equal(err, null)
+        console.log(articlesIDs)
     })
 
+
+
+
+Remove articles
+
+    redblade.remove('article', { poster: 'airjd', keywords: 'SQL' }, function(err, num) {
+        console.log(num)
+
+        redblade.client.zrange('articlekeys:NoSQL', 0, 100, function(err, members) {
+          //should be []
+          console.log(members)
+        })
+    })
