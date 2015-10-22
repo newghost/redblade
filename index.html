@@ -1,0 +1,206 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+
+    <title>Redblade: Redis 对象关系映射(ORM)和半自动索引工具</title>
+
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+  </head>
+
+  <body>
+    <div class="container">
+
+<div class="page-header">
+  <h1>Redblade 是一个Redis对象关系映射(ORM)和索引工具</h1>
+  <p class="lead">
+  redis是目前最快的键值对内存数据库，一般用在需要应对超大并发应用和高速缓存的场合。
+  但她无索引、无外键、无约束，查询不便，多和其它数据搭配使用。redblade可以帮助你自动实现索引和数据查询；
+  </p>
+</div>
+
+<br><br>
+
+<h3>安装</h3>
+<p>你可以通过NPM安装， 同时它需要搭配node_redis驱动<code>npm install redis</code></p>
+<pre>npm install redblade</pre>
+
+
+<br><br>
+
+
+<h3>初始化</h3>
+<p>你需要先安装redis驱动</p>
+<pre>
+var client = require('redis').createClient();
+
+//选一个空数据库
+client.select(4)
+
+//schema: 存放schema定义文件的路径，可以不填，并稍后加载
+redblade.init({ schema:'/path/to/your/schema/folder',  client: client }, function(err) {
+
+})
+</pre>
+
+
+<br><br>
+
+
+<h3>定义schema</h3>
+<p>这里定义了一个名为article的schema，并指定poster为索引字段（索引为无序集合），keywords为关键字字段（索引为有序集合，有两个参数，第二个参数为权重）</p>
+<pre>
+redblade.schema('article', {
+    "_id"         : "id"
+  , "poster"      : "index('user_article')"
+  , "keywords"    : "keywords('articlekeys', return +new Date() / 60000 | 0)"
+  , "title"       : ""
+  , "content"     : ""
+})
+</pre>
+
+
+<br><br>
+
+
+
+<h3>插入一条article数据</h3>
+<p>其中多余字段未在schema中定义，会被自动删除</p>
+<pre>
+redblade.insert('article', {
+   _id        : '1234567890'
+  , poster     : 'airjd'
+  , keywords   : '信息技术,JavaScript,NoSQL'
+  , title      : '测试用的SLIDE 标题'
+  , content    : '测试用的SLIDE 内容'
+  , '多余字段'   : '测试'
+}, function(err) {
+
+})
+</pre>
+
+
+<br><br>
+
+
+<h3>查询数据</h3>
+<p>根据schema中的索引查询此article</p>
+<pre>
+redblade.select('article', { poster:'airjd' }, function(err, articles) {
+  console.log(articles[0])
+})
+
+//or
+
+redblade.select('article', { keywords: 'NoSQL' }, function(err, articles) {
+  console.log(articles[0])
+})
+</pre>
+
+
+<br><br>
+
+
+<h3>查询数据</h3>
+<p>根据schema中的索引查询此article</p>
+<pre>
+redblade.select('article', { poster:'airjd' }, function(err, articles) {
+  console.log(articles[0])
+})
+
+//or
+
+redblade.select('article', { keywords: 'NoSQL' }, function(err, articles) {
+  console.log(articles[0])
+})
+</pre>
+
+
+
+<br><br>
+
+
+<h3>原理是什么</h3>
+<p>index：会自动根据插入的数据创建一个user_article:*的无序集合（因为无权重参数）</p>
+<pre>
+/*
+set: "poster" : "index('user_article')" => user_article:[poster value]
+*/
+redblade.client.smembers('user_article:airjd', function (err, articleIDs) {
+    console.log(articlesIDs)
+})
+</pre>
+
+<p>keywords:会自动根据数据创建articleskeys无序集合和 articlekeys:* 的有序集合</p>
+<pre>
+/*
+sorted set: "keywords" : "keywords('articlekeys', return +new Date() / 60000 | 0)"
+*/
+redblade.client.smembers('articlekeys', function(err, keys) {
+    console.log(keys)
+    //['信息技术','JavaScript','NoSQL']
+})
+
+redblade.client.zrange('articlekeys:NoSQL', 0, 100, function(err, articleIDs) {
+    console.log(articleIDs)
+    //["1234567890"]
+})
+</pre>
+
+
+
+<br><br>
+
+
+<h3>更新</h3>
+<p>注意此函数被设计成当数据不存在时会在redis新建一条</p>
+<pre>
+redblade.update('article', {
+   _id        : '1234567890'
+  , content    : '更新了测试用的SLIDE 内容'
+}, function(err) {
+
+})
+</pre>
+
+
+<br><br>
+
+
+<h3>删除</h3>
+<p>你可以使用多个条件进行查询或删除</p>
+<pre>
+redblade.remove('article', { poster: 'airjd', keywords: 'SQL' }, function(err, num) {
+    console.log(num)
+
+    redblade.client.zrange('articlekeys:NoSQL', 0, 100, function(err, members) {
+      //should be []
+      console.log(members)
+    })
+})
+</pre>
+
+
+
+
+
+
+
+
+
+
+
+
+    </div> <!-- /container -->
+
+    <script src="js/jquery.min.js"></script>
+    <script src="js/bootstrap.js"></script>
+  </body>
+</html>
