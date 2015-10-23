@@ -34,12 +34,15 @@ Init
     var client = require('redis').createClient();
 
     //choose an empty DB
-    client.select(4)
+    client.select(4);
+
+
+    var redblade = require('redblade');
 
     //schema is optional
     redblade.init({ schema:'/path/to/your/schema/folder',  client: client }, function(err) {
         
-    })
+    });
 
 
 
