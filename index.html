@@ -1,29 +1,78 @@
-
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
-    <meta name="description" content="">
-    <meta name="author" content="">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+<meta name="description" content="">
+<meta name="author" content="">
 
 
-    <title>Redblade: Redis 对象关系映射(ORM)和半自动索引工具</title>
+<title>Redblade: Redis 对象关系映射(ORM)和半自动索引工具</title>
 
-    <link href="css/bootstrap.min.css" rel="stylesheet">
-  </head>
+<link href="css/bootstrap.min.css" rel="stylesheet">
 
-  <body>
-    <div class="container">
+
+
+
+
+<style>
+body{
+  padding-top: 70px;
+  padding-bottom: 30px;
+}
+</style>
+
+
+</head>
+
+<body>
+
+
+
+
+<nav class="navbar navbar-inverse navbar-fixed-top">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="#">Redblade</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <!-- <li class="active"><a href="#">Home</a></li> -->
+      </ul>
+    </div>
+  </div>
+</nav>
+
+
+
+
+
+
+
+
+
+
+<div class="container theme-showcase" role="main">
+
+<div class="jumbotron">
+  <h2>Redblade 是一个Redis数据库对象关系映射(ORM)和索引工具</h2>
+  <p class="lead">
+  redis是目前最快的键值对内存数据库，一般在需要应对超大并发应用和高速缓存的场合。
+  但她无索引、无外键、无约束，查询不便，多和其它数据库搭配使用。redblade可以帮助你自动实现索引和数据查询；
+  </p>
+</div>
+
 
 <div class="page-header">
-  <h1>Redblade 是一个Redis对象关系映射(ORM)和索引工具</h1>
-  <p class="lead">
-  redis是目前最快的键值对内存数据库，一般用在需要应对超大并发应用和高速缓存的场合。
-  但她无索引、无外键、无约束，查询不便，多和其它数据搭配使用。redblade可以帮助你自动实现索引和数据查询；
-  </p>
+
 </div>
 
 <br><br>
@@ -42,7 +91,9 @@
 var client = require('redis').createClient();
 
 //选一个空数据库
-client.select(4)
+client.select(4);
+
+var redblade = require('redblade');
 
 //schema: 存放schema定义文件的路径，可以不填，并稍后加载
 redblade.init({ schema:'/path/to/your/schema/folder',  client: client }, function(err) {
@@ -188,17 +239,20 @@ redblade.remove('article', { poster: 'airjd', keywords: 'SQL' }, function(err, n
 </pre>
 
 
-
-
-
-
-
-
-
-
-
-
 </div>
+
+
+
+<div class="container">
+  <hr>
+  <footer>
+    <p class="pull-right"><a href="#">Back to top</a></p>
+    <p>
+      源文件 <a href="https://github.com/newghost/redblade" target="_blank">Github</a>
+    </p>
+  </footer>
+</div>
+
 
 <script src="js/jquery.min.js"></script>
 <script src="js/bootstrap.js"></script>
