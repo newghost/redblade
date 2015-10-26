@@ -43,9 +43,10 @@ body{
       </button>
       <a class="navbar-brand" href="#">Redblade</a>
     </div>
-    <div id="navbar" class="navbar-collapse collapse">
+    <div id="navbar" class="navbar-collapse collapse pull-right">
       <ul class="nav navbar-nav">
-        <!-- <li class="active"><a href="#">Home</a></li> -->
+        <li><a href="#">简介</a></li>
+        <li><a href="#api">API</a></li>
       </ul>
     </div>
   </div>
@@ -65,8 +66,8 @@ body{
 <div class="jumbotron">
   <h2>Redblade 是一个Redis数据库对象关系映射(ORM)和索引工具</h2>
   <p class="lead">
-  redis是目前最快的键值对内存数据库，一般在需要应对超大并发应用和高速缓存的场合。
-  但她无索引、无外键、无约束，查询不便，多和其它数据库搭配使用。redblade可以帮助你自动实现索引和数据查询；
+  redis是目前最快的键值对内存数据库，一般用在需要应对超大规则并发应用和高速缓存的场合。
+  但其无索引、无外键、无约束，查询不便，多数情况下和其它数据库搭配使用。redblade可以帮助你自动实现索引和数据查询；
   </p>
 </div>
 
@@ -112,8 +113,8 @@ redblade.schema('article', {
     "_id"         : "id"
   , "poster"      : "index('user_article')"
   , "keywords"    : "keywords('articlekeys', return +new Date() / 60000 | 0)"
-  , "title"       : ""
-  , "content"     : ""
+  , "title"       : "minlen(4)"
+  , "content"     : "maxlen(6000)"
 })
 </pre>
 
@@ -126,7 +127,7 @@ redblade.schema('article', {
 <p>其中多余字段未在schema中定义，会被自动删除</p>
 <pre>
 redblade.insert('article', {
-   _id        : '1234567890'
+   _id         : '1234567890'
   , poster     : 'airjd'
   , keywords   : '信息技术,JavaScript,NoSQL'
   , title      : '测试用的SLIDE 标题'
@@ -240,6 +241,38 @@ redblade.remove('article', { poster: 'airjd', keywords: 'SQL' }, function(err, n
 
 
 </div>
+
+
+
+
+<br><br><br>
+
+
+<div id="api" class="container">
+
+<h1>API</h1>
+
+<h2>Filter函数</h2>
+<p>验证数据合法性，数据更新之前执行</p>
+<blockquote>
+int; max(maxNumber); min(minNumber); maxlen(maxNumber); minlen(minNumber); unique(schemaName)
+</blockquote>
+
+
+<h2>Commands函数</h2>
+<p>相关性晚新，数据更新之后执行</p>
+<blockquote>
+index(indexSchema [, score]); keywords(keywordSchema [, score]); 
+</blockquote>
+
+<br><br><br>
+
+<p>
+注* 1) score支持以return开头的自定义函数  2) 这些函数只在有值时起作用
+</p>
+
+
+<br><br><br><br><br><br>
 
 
 
