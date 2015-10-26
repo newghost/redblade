@@ -16,7 +16,9 @@ BSD, See our license file
 Create and remove index key automatically
 
 
-中文文档帮助，请查看: [redblade.ourjs.com](http://redblade.ourjs.com)
+中文文档 [redblade.ourjs.com](http://redblade.ourjs.com)
+----
+
 
 
 Install
