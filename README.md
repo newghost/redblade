@@ -19,9 +19,6 @@ Create and remove index key automatically
 
 
 
-
-
-
 Init
 
     //create a redis client
@@ -112,3 +109,10 @@ Remove articles
           console.log(members)
         })
     })
+
+
+
+
+中文文档
+====
+http://redblade.ourjs.com/
