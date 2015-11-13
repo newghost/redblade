@@ -143,25 +143,7 @@ redblade.insert('article', {
 
 
 <h3>查询数据</h3>
-<p>根据schema中的索引查询此article</p>
-<pre>
-redblade.select('article', { poster:'airjd' }, function(err, articles) {
-  console.log(articles[0])
-})
-
-//or
-
-redblade.select('article', { keywords: 'NoSQL' }, function(err, articles) {
-  console.log(articles[0])
-})
-</pre>
-
-
-<br><br>
-
-
-<h3>查询数据</h3>
-<p>根据schema中的索引查询此article</p>
+<p>根据schema中的索引查询此article：　注意，只有在schema中定义了 index 或 keywords索引的字段才能被查询，多个查询条件可以一起使用</p>
 <pre>
 redblade.select('article', { poster:'airjd' }, function(err, articles) {
   console.log(articles[0])
@@ -180,7 +162,7 @@ redblade.select('article', { keywords: 'NoSQL' }, function(err, articles) {
 
 
 <h3>原理是什么</h3>
-<p>index：会自动根据插入的数据创建一个user_article:*的无序集合（因为无权重参数）</p>
+<p>index：会自动根据插入的数据创建一个user_article:*的无序集合（因为无权重参数），　为1:N的关系，如需1:1可在schema中使用 unique('user_article')修饰</p>
 <pre>
 /*
 set: "poster" : "index('user_article')" => user_article:[poster value]
@@ -253,14 +235,14 @@ redblade.remove('article', { poster: 'airjd', keywords: 'SQL' }, function(err, n
 <h1>API</h1>
 
 <h2>Filter函数</h2>
-<p>验证数据合法性，数据更新之前执行</p>
+<p>验证数据合法性，数据更新之前执行，不满足条件则不进行任何修改</p>
 <blockquote>
 int; max(maxNumber); min(minNumber); maxlen(maxNumber); minlen(minNumber); unique(schemaName)
 </blockquote>
 
 
 <h2>Commands函数</h2>
-<p>相关性更新指令，数据更新之后执行</p>
+<p>相关性更新指令，数据更新之后执行，更新相关的索引等</p>
 <blockquote>
 index(indexSchema [, score]); keywords(keywordSchema [, score]); 
 </blockquote>
@@ -268,7 +250,7 @@ index(indexSchema [, score]); keywords(keywordSchema [, score]);
 <br><br><br>
 
 <p>
-注* 1) score支持以return开头的自定义函数  2) 这些函数只在有值时起作用
+注* 1) score支持以return开头的自定义函数  2) 字段方法只有在这些字段有值的时侯才触发
 </p>
 
 
