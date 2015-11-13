@@ -62,7 +62,7 @@ Insert an article
     })
 
 
-Select User by Index Field
+Select User by [Only index fileds defined in schema can be selected, like index, keywords ]
 
     redblade.select('article', { poster:'airjd' }, function(err, articles) {
       console.log(articles[0])
