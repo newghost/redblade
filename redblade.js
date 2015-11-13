@@ -269,13 +269,13 @@ FILTERS.unique = function(schemaName) {
     , value       = this.value
     , model       = this.model
     , schema      = this.schema
-    , operator    = this.operator
+    , mode        = this.mode
     , done        = this.done
 
   var key = (schemaName || schema) + ':' + value
 
   //在insert时; ID不应该存在
-  if (operator == 'insert') {
+  if (mode == 'insert') {
     client.exists(key, function(err, exist) {
       if (err) {
         console.error(err)
@@ -332,30 +332,41 @@ client.zadd('user_side:airjd', timeStamp, _idValue)
 带权重的外键无法进行交集(left/right/inner join)、并集(union)、异或（not in）查询
 只有集合有相关的命令： sinter / sunion / sdiff
 
-operator类型： insert/update/remove
+mode类型： insert/update/remove
 */
 COMMANDS.index = function(indexSchema, score) {
   var field     = this.field
     , value     = this.value
     , model     = this.model
-    , operator  = this.operator
+    , oldModel  = this.oldModel || {}
+    , mode      = this.mode
     , schema    = redblade.SCHEMA[this.schema] || {}
     , done      = this.done
+    , hasScore  = typeof score == 'undefined'
     , _idField_ = schema._idField_
     , _idValue  = model[_idField_]
 
   if (!indexSchema || !field || !model || !_idField_ || typeof _idValue == 'undefined') {
+    done && done(new Error('schema@index parameter error'))
     return false
   }
 
   var key = indexSchema + ':' + value
 
-  if (operator == 'remove') {
-    typeof score == 'undefined'
+  if (mode == 'remove') {
+    hasScore
       ? client.srem(key, _idValue, done)
       : client.zrem(key, _idValue, done)
   } else {
-    typeof score == 'undefined'
+    var oldValue = oldModel[field]
+    if (typeof oldValue != 'undefined' && oldValue != value) {
+      var oldIndex = indexSchema + ':' + oldValue
+      hasScore
+        ? client.srem(oldIndex, _idValue)
+        : client.zrem(oldIndex, _idValue)
+    }
+
+    hasScore
       ? client.sadd(key, _idValue, function(err) {
         if (err) {
           console.error(err)
@@ -402,67 +413,133 @@ client.zadd('category:JavaScript', score, _idValue)
 */
 COMMANDS.keywords = function(keywordSchema, score) {
   var field     = this.field
-    , value     = this.value
+    , value     = (this.value || '').toString().trim()
     , model     = this.model
-    , operator  = this.operator
+    , oldModel  = this.oldModel || {}
+    , mode      = this.mode
     , done      = this.done
     , schema    = redblade.SCHEMA[this.schema] || {}
     , _idField_ = schema._idField_
     , _idValue  = model[_idField_]
+    , hasScore  = typeof score == 'undefined'
+
 
   if (!keywordSchema || !field || !model || !_idField_ || typeof _idValue == 'undefined') {
     done && done(new Error('schema@keywords parameter error'))
+
+    //返回false代表不需要等待callback
     return false
   }
 
-  client.smembers(keywordSchema, function(err, members) {
+  var i
+    , keyword
+    , keywords
+    , oldValue  = (oldModel[field] || '').toString().trim()
+    , multi     = client.multi()
+
+  //当处于删除模式时； oldModel不存在; model即为oldModel
+  if (mode == 'remove' && oldValue == '') {
+    oldValue = value
+  }
+
+  //先删除旧的关键字索引
+  if (oldValue) {
+    keywords = oldValue.split(',')
+    for (i = 0; i < keywords.length; i++) {
+      keyword = keywords[i]
+      if (keyword) {
+        key = keywordSchema + ':' + keyword
+
+        hasScore
+          ? multi.srem(key, _idValue)
+          : multi.zrem(key, _idValue)
+      }
+    }
+  }
+
+  //再添加新的关键字索引
+  if (value && mode != 'remove') {
+    keywords = value.split(',')
+
+    for (i = 0; i < keywords.length; i++) {
+      keyword = keywords[i]
+      if (keyword) {
+        key = keywordSchema + ':' + keyword
+
+        //将所有的关键字存放到keywordSchema集合中
+        multi.sadd(keywordSchema, keyword)
+
+        hasScore
+          ? multi.sadd(key, _idValue)
+          : multi.zadd(key, score, _idValue)
+      }
+    }
+  }
+
+  multi.exec(function (err, replies) {
     if (err) {
       console.error(err)
       done && done(err)
       return
     }
 
-    var multi = client.multi()
-
-    for (var i = 0; i < members.length; i++) {
-      var key     = keywordSchema + ':' + members[i]
-
-      typeof score == 'undefined'
-        ? multi.srem(key, _idValue)
-        : multi.zrem(key, _idValue)
-    }
-
-    if (operator != 'remove' && value) {
-      var keywords = value.split(',')
-      for (var j = 0; j < keywords.length; j++) {
-        var keyword = keywords[j]
-        if (keyword) {
-          key = keywordSchema + ':' + keyword
-
-          multi.sadd(keywordSchema, keyword)
-
-          typeof score == 'undefined'
-            ? multi.sadd(key, _idValue)
-            : multi.zadd(key, score, _idValue)
-        }
-      }
-    }
-
-    //console.log(multi.queue)
-
-    multi.exec(function (err, replies) {
-      if (err) {
-        console.error(err)
-        done && done(err)
-        return
-      }
-
-      done && done()
-    })
+    done && done()
   })
 
+  //返回null代表有callback需要执行
   return null
 }
+
+
+
+/*
+创建一个有序列表的索引
+id与score存放在key中，ID值唯一
+order是一对一的关系, order只会创建一个key
+*/
+COMMANDS.order = function(key, score) {
+  var field     = this.field
+    , value     = this.value
+    , model     = this.model
+    , mode      = this.mode
+    , schema    = redblade.SCHEMA[this.schema] || {}
+    , done      = this.done
+    , hasScore  = typeof score == 'undefined'
+    , _idField_ = schema._idField_
+    , _idValue  = model[_idField_]
+
+  if (!key || !field || !model || !_idField_ || typeof _idValue == 'undefined') {
+    done && done(new Error('schema@order parameter error'))
+    return false
+  }
+
+  //console.log(key, score, _idValue, this)
+  //console.log(key, score)
+
+  if (mode == 'remove') {
+    hasScore
+      ? client.srem(key, _idValue, done)
+      : client.zrem(key, _idValue, done)
+  } else {
+    hasScore
+      ? client.sadd(key, _idValue, function(err) {
+        if (err) {
+          console.error(err)
+        }
+        done && done(err)
+      })
+      : client.zadd(key, score, _idValue, function(err) {
+        if (err) {
+          console.error(err)
+        }
+        done && done(err)
+      })
+  }
+
+  //指定还没有处理完需要时间等待
+  return null
+}
+
 
 
 /*
@@ -473,7 +550,7 @@ var filter = function(schemaName, target, cb, options) {
 
   var schema   = SCHEMA[schemaName]
     , FUNCS    = options.FUNCS || FILTERS
-    , operator = options.operator
+    , mode     = options.mode
     , flag     = true
 
   if (!schema) {
@@ -529,6 +606,9 @@ var filter = function(schemaName, target, cb, options) {
 
         //对象规则参数都存在
         if (func && args) {
+          //clone args in the schema
+          args = args.slice()
+
           //将function对象参数绑定当前model对象执行
           for (var k = 0; k < args.length; k++) {
             var arg = args[k]
@@ -545,7 +625,8 @@ var filter = function(schemaName, target, cb, options) {
               field     : field
             , value     : target[field]
             , model     : target
-            , operator  : operator
+            , oldModel  : options.oldModel
+            , mode      : mode
             , schema    : schemaName
             , done      : doneHandler
           }
@@ -596,7 +677,7 @@ var relate = function(schemaName, target, cb) {
 delete is taken by javascript rename to remove
 */
 var removeRelate = function(schemaName, target, cb) {
-  filter(schemaName, target, cb, { FUNCS: COMMANDS, operator: 'remove' })
+  filter(schemaName, target, cb, { FUNCS: COMMANDS, mode: 'remove' })
 }
 
 
@@ -624,6 +705,10 @@ var select = function(schemaName, where, cb, options) {
     , conditions  = Object.keys(where)
     , count1      = 0
     , count2      = 0
+    //选择条件， 这些条件只在有序集合中起作用
+    , from        = typeof options.from == 'number' ? options.from : 0
+    , to          = typeof options.to == 'number' ? options.to : 1000
+    , desc        = options.desc
 
 
   var getFromIDs = function(objectIDs) {
@@ -638,7 +723,7 @@ var select = function(schemaName, where, cb, options) {
     /*
     将交集集合提取元素
     */
-    var count2   = 0
+    var count2  = 0
       , objects = []
 
 
@@ -649,7 +734,7 @@ var select = function(schemaName, where, cb, options) {
 
       if (++count2 == objectIDs.length) {
         //如果是删除操作符，则只返回受影响行数
-        if (options.operator == 'remove') {
+        if (options.mode == 'remove') {
           cb && cb(null, count2)
         } else {
           cb && cb(null, objects)
@@ -671,11 +756,11 @@ var select = function(schemaName, where, cb, options) {
       var onGetAll = function(err, object) {
         if (err) {
           console.error(err)
-        } else if (options.operator == 'remove') {
+        } else if (options.mode == 'remove' && object) {
           removeRelate(schemaName, object, onRemoveRelate)
           //Avoid isAllDone execute twice
           return
-        } else {
+        } else if (object) {
           objects.push(object)
         }
 
@@ -725,9 +810,11 @@ var select = function(schemaName, where, cb, options) {
   /*
   将where中的每个条件的集合提取出来；如果全部条件均为set则可使用inter, union等连接查询指令
   */
-  var multi = client.multi()
-    , skeys = []
-    , isSet = true
+  var multi   = client.multi()
+      //所有集合均是set
+    , skeys   = []
+      //所有集合均是sorted set
+    , zkeys   = []
 
   var conditionHandler = function(condition) {
     count1++
@@ -739,7 +826,10 @@ var select = function(schemaName, where, cb, options) {
     */
     var rules = schema[condition]
     if (!rules) {
-      return console.error('select error ' + schemaName + ':' + condition + ' is not defined in schema')
+      var err = new Error('select error ' + condition + '@' + schemaName + ' is not defined in schema')
+      console.error(err)
+      cb && cb(err, [])
+      return
     }
 
     /*
@@ -747,33 +837,42 @@ var select = function(schemaName, where, cb, options) {
     */
     if (rules.id) {
       var idArr = [ where[condition] ]
-      isSet = false
+      skeys = null
+      zkeys = null
     } else {
       //只有index或keywords属性才能让where条件起作用
       var conditionSchema = rules.index || rules.keywords
       if (!conditionSchema) {
-        return console.error('select error ' + schemaName + ':' + condition + ' is not an index field') 
+        var err = new Error('select error ' + schemaName + ':' + condition + ' is not an index field')
+        console.error(err)
+        cb && cb(err, [])
+        return
       }
 
       var conditionKey = conditionSchema[0] + ':' + where[condition]
 
       //schema中只有一个参数为无序集合(set); 两个参数则为有序集合(sorted set)
       if (conditionSchema.length > 1) {
-        multi.zrange(conditionKey, 0, 10000)
-        isSet = false
+
+        desc === true
+          ? multi.zrevrange(conditionKey, from, to)
+          : multi.zrange(conditionKey, from, to)
+
+        zkeys && zkeys.push(conditionKey)
+        skeys = null
       } else {
         multi.smembers(conditionKey)
-        isSet && skeys.push(conditionKey)
+        zkeys && zkeys.push(conditionKey)
+        skeys && skeys.push(conditionKey)
       }
     }
 
 
     if (count1 == conditions.length) {
       /*
-      返回的是一个纯set类型的二维数组，使用内置函数求其交集or并集
-      results: [ ['airjd'], ['kris', 'airjd'] ]
+      返回的是一个纯set类型的二维数组，使用sinter函数
       */
-      if (isSet) {
+      if (skeys && skeys.length > 1) {
         multi.discard()
         skeys.push(function(err, IDs) {
           if (err) {
@@ -788,7 +887,41 @@ var select = function(schemaName, where, cb, options) {
       }
 
       /*
+      返回的是一个纯sorted set类型的二维数组，使用; zinterstore同时支持zets和sets
+      http://blog.redsmin.com/post/55718899396/how-to-use-zinterstore-with-both-zsets-and-sets
+      */
+      else if (zkeys && zkeys.length > 1) {
+        multi.discard()
+
+        var transaction   = client.multi()
+            //生成一个随机的keys作为临时查询结果存储地
+          , tempStoreKey = '_tmp_ix_' + (+new Date()).toString(36) + (Math.random() * 100000000 | 0).toString(36)
+
+        zkeys.unshift(tempStoreKey, zkeys.length)
+
+        transaction.zinterstore.apply(transaction, zkeys)
+
+        desc === true
+          ? transaction.zrevrange(conditionKey, from, to)
+          : transaction.zrange(conditionKey, from, to)
+
+        transaction.del(tempStoreKey)
+        transaction.exec(function(err, results) {
+          if (err) {
+            cb && cb(err)
+            return
+          }
+
+          //第二条
+          getFromIDs(results[1] || [])
+        })
+
+        //console.log(transaction.queue)
+      }
+
+      /*
       返回的是一个类型多样的含ID的二维数组，求其交集or并集？先从少到多排列，减少比较次数
+      不建议使用ID作为多个查询条件
       results: [ ['airjd'], ['kris', 'airjd'] ]
       */
       else {
@@ -805,6 +938,9 @@ var select = function(schemaName, where, cb, options) {
     }
   }
 
+  /*
+  只传入schemaName使用keys查找，性能较差
+  */
   if (conditions.length < 1) {
     client.keys(schemaName + ':*', function(err, keys) {
       if (err) {
@@ -829,33 +965,46 @@ var select = function(schemaName, where, cb, options) {
 
 /*
 更新传进来的target
+Update只能更新包含ID字段的数据
 target若存在ID字段, 则以此ID进行更新否则新添加一条记录
 */
-var update = function(schemaName, target, cb, operator) {
+var update = function(schemaName, target, cb, options) {
   var schema  = SCHEMA[schemaName]
     , idField = schema._idField_
     , id      = target[idField]
+    , options = options || {}
 
-  if (typeof id == 'undefined') {
+  if (typeof id == 'undefined' || id === '') {
     cb && cb(new Error('update ' + schemaName + ' failed: ID is not exist'))
     return
   }
 
-  filter(schemaName, target, function(err, result) {
-    if (err || result === false) {
-      cb && cb(err || new Error('update ' + schemaName + ' failed: invalid field value'))
+  var key = schemaName + ':' + id
+
+  client.hgetall(key, function(err, object) {
+    if (!object && options.mode != 'insert') {
+      cb && cb(err || new Error('update ' + key + ' failed: object doesn\'t exist'))
       return
     }
 
-    client.hmset(schemaName + ':' + id, target, function(err) {
-      if (err) {
-        cb && cb(err)
+    filter(schemaName, target, function(err, result) {
+      if (err || result === false) {
+        cb && cb(err || new Error('update ' + schemaName + ' failed: invalid field value'))
         return
       }
 
-      filter(schemaName, target, cb, { FUNCS: COMMANDS, operator: operator })
-    })
-  }, { FUNCS: FILTERS, operator: operator })
+      client.hmset(schemaName + ':' + id, target, function(err) {
+        if (err) {
+          cb && cb(err)
+          return
+        }
+
+        filter(schemaName, target, cb, { FUNCS: COMMANDS, mode: options.mode, oldModel: object  })
+      })
+    }, { FUNCS: FILTERS, mode: options.mode, oldModel: object })
+
+  })
+
 }
 
 
@@ -863,7 +1012,7 @@ var update = function(schemaName, target, cb, operator) {
 新添加一条记录，会判断id/unique字段是否符合唯一性条件
 */
 var insert = function(schemaName, target, cb) {
-  update(schemaName, target, cb, 'insert')
+  update(schemaName, target, cb, { mode: 'insert' })
 }
 
 
@@ -872,7 +1021,9 @@ var insert = function(schemaName, target, cb) {
 */
 var remove = function() {
   var args = Array.prototype.slice.call(arguments)
-  args.push({ operator: 'remove' })
+  //callback is null
+  args.length == 2 && args.push(null)
+  args.push({ mode: 'remove' })
   select.apply(this, args)
 }
 

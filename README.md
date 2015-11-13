@@ -16,15 +16,7 @@ BSD, See our license file
 Create and remove index key automatically
 
 
-中文文档 [redblade.ourjs.com](http://redblade.ourjs.com)
-----
 
-
-
-Install
-
-
-    npm install redblade
 
 
 
@@ -36,15 +28,12 @@ Init
     var client = require('redis').createClient();
 
     //choose an empty DB
-    client.select(4);
-
-
-    var redblade = require('redblade');
+    client.select(4)
 
     //schema is optional
     redblade.init({ schema:'/path/to/your/schema/folder',  client: client }, function(err) {
         
-    });
+    })
 
 
 
