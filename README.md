@@ -116,3 +116,7 @@ Remove articles
 中文文档
 ====
 http://redblade.ourjs.com/
+
+示例项目
+====
+http://github.com/newghost/ourjs
